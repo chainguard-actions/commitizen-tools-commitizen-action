@@ -1,0 +1,96 @@
+name: Test manual version bump (files-only, no push)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up commitizen config for manual version bump
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Write a .cz.toml config with explicit tag_format
+          printf '[tool.commitizen]\nname = "cz_conventional_commits"\nversion = "2.0.0"\ntag_format = "v$version"\n' > .cz.toml
+
+          git add .cz.toml
+          git commit -m "chore: add commitizen config"
+
+          # Tag the current version
+          git tag v2.0.0
+
+          # Set up a git origin reachable inside the Docker container
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          manual_version: "2.1.0"
+          commit: "false"
+          push: "false"
+          changelog: "false"
+          no_raise: "21"
+
+      - name: Assert previous_version is 2.0.0
+        env:
+          PREV: ${{ steps.action.outputs.previous_version }}
+        run: |
+          echo "previous_version: $PREV"
+          if [ "$PREV" != "2.0.0" ]; then
+            echo "FAIL: expected previous_version=2.0.0 but got '$PREV'"
+            exit 1
+          fi
+          echo "PASS: previous_version=2.0.0"
+
+      - name: Assert next_version is 2.1.0
+        env:
+          NEXT: ${{ steps.action.outputs.next_version }}
+        run: |
+          echo "next_version: $NEXT"
+          if [ "$NEXT" != "2.1.0" ]; then
+            echo "FAIL: expected next_version=2.1.0 but got '$NEXT'"
+            exit 1
+          fi
+          echo "PASS: next_version=2.1.0"
+
+      - name: Assert version output (alias) is 2.1.0
+        env:
+          VER: ${{ steps.action.outputs.version }}
+        run: |
+          echo "version: $VER"
+          if [ "$VER" != "2.1.0" ]; then
+            echo "FAIL: expected version=2.1.0 but got '$VER'"
+            exit 1
+          fi
+          echo "PASS: version=2.1.0"
+
+      - name: Assert next_version_major is 2
+        env:
+          MAJOR: ${{ steps.action.outputs.next_version_major }}
+        run: |
+          echo "next_version_major: $MAJOR"
+          if [ "$MAJOR" != "2" ]; then
+            echo "FAIL: expected next_version_major=2 but got '$MAJOR'"
+            exit 1
+          fi
+          echo "PASS: next_version_major=2"
+
+      - name: Assert next_version_minor is 1
+        env:
+          MINOR: ${{ steps.action.outputs.next_version_minor }}
+        run: |
+          echo "next_version_minor: $MINOR"
+          if [ "$MINOR" != "1" ]; then
+            echo "FAIL: expected next_version_minor=1 but got '$MINOR'"
+            exit 1
+          fi
+          echo "PASS: next_version_minor=1"

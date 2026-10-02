@@ -1,0 +1,85 @@
+name: Test dry-run mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up commitizen config and git state
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Write a .cz.toml config with explicit tag_format
+          printf '[tool.commitizen]\nname = "cz_conventional_commits"\nversion = "0.1.0"\ntag_format = "v$version"\n' > .cz.toml
+
+          git add .cz.toml
+          git commit -m "chore: add commitizen config"
+
+          # Tag the current version so commitizen knows where we are
+          git tag v0.1.0
+
+          # Set up a git origin reachable inside the Docker container
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          dry_run: "true"
+          push: "false"
+          changelog: "false"
+          increment: "MINOR"
+          no_raise: "21"
+
+      - name: Assert previous_version output is set
+        env:
+          PREV: ${{ steps.action.outputs.previous_version }}
+        run: |
+          echo "previous_version: $PREV"
+          if [ -z "$PREV" ]; then
+            echo "FAIL: previous_version output is empty"
+            exit 1
+          fi
+          echo "PASS: previous_version=$PREV"
+
+      - name: Assert previous_version is 0.1.0
+        env:
+          PREV: ${{ steps.action.outputs.previous_version }}
+        run: |
+          echo "previous_version: $PREV"
+          if [ "$PREV" != "0.1.0" ]; then
+            echo "FAIL: expected previous_version=0.1.0 but got '$PREV'"
+            exit 1
+          fi
+          echo "PASS: previous_version=0.1.0"
+
+      - name: Assert next_version output is set
+        env:
+          NEXT: ${{ steps.action.outputs.next_version }}
+        run: |
+          echo "next_version: $NEXT"
+          if [ -z "$NEXT" ]; then
+            echo "FAIL: next_version output is empty"
+            exit 1
+          fi
+          echo "PASS: next_version=$NEXT"
+
+      - name: Assert version output is set
+        env:
+          VER: ${{ steps.action.outputs.version }}
+        run: |
+          echo "version: $VER"
+          if [ -z "$VER" ]; then
+            echo "FAIL: version output is empty"
+            exit 1
+          fi
+          echo "PASS: version=$VER"

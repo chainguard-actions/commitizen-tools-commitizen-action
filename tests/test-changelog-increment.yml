@@ -1,0 +1,78 @@
+name: Test changelog_increment_filename, github_token, and actor inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up commitizen config for changelog increment test
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Write a .cz.toml config with explicit tag_format
+          printf '[tool.commitizen]\nname = "cz_conventional_commits"\nversion = "4.0.0"\ntag_format = "v$version"\n' > .cz.toml
+
+          git add .cz.toml
+          git commit -m "chore: add commitizen config"
+
+          # Tag the current version
+          git tag v4.0.0
+
+          # Add a conventional commit so commitizen can detect a bump
+          git commit --allow-empty -m "feat: add new feature for changelog test"
+
+          # Set up a git origin reachable inside the Docker container
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          github_token: ${{ github.token }}
+          actor: ${{ github.actor }}
+          increment: "MINOR"
+          commit: "false"
+          push: "false"
+          changelog: "true"
+          changelog_increment_filename: "/tmp/changelog-increment.md"
+          no_raise: "21"
+
+      - name: Assert previous_version is 4.0.0
+        env:
+          PREV: ${{ steps.action.outputs.previous_version }}
+        run: |
+          echo "previous_version: $PREV"
+          if [ "$PREV" != "4.0.0" ]; then
+            echo "FAIL: expected previous_version=4.0.0 but got '$PREV'"
+            exit 1
+          fi
+          echo "PASS: previous_version=4.0.0"
+
+      - name: Assert next_version is set
+        env:
+          NEXT: ${{ steps.action.outputs.next_version }}
+        run: |
+          echo "next_version: $NEXT"
+          if [ -z "$NEXT" ]; then
+            echo "FAIL: next_version output is empty"
+            exit 1
+          fi
+          echo "PASS: next_version=$NEXT"
+
+      - name: Assert changelog increment file was created
+        run: |
+          if [ ! -f "/tmp/changelog-increment.md" ]; then
+            echo "FAIL: changelog_increment_filename /tmp/changelog-increment.md was not created"
+            exit 1
+          fi
+          echo "PASS: changelog increment file exists"
+          cat /tmp/changelog-increment.md
