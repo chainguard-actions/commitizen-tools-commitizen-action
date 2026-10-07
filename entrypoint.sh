@@ -38,17 +38,14 @@ if [[ $INPUT_WORKING_DIRECTORY ]]; then
   cd "$INPUT_WORKING_DIRECTORY"
 fi
 
-# Helper: strip newlines/carriage-returns to prevent GITHUB_ENV/GITHUB_OUTPUT injection
-sanitize() { printf '%s' "$1" | tr -d '\n\r'; }
-
-PREV_REV="$(sanitize "$(cz version --project)")"
+PREV_REV="$(cz version --project)"
 echo "PREVIOUS_REVISION=${PREV_REV}" >>"$GITHUB_ENV"
 echo "previous_version=${PREV_REV}" >>"$GITHUB_OUTPUT"
 
-PREV_REV_MAJOR="$(sanitize "$(cz version --project --major)")"
+PREV_REV_MAJOR="$(cz version --project --major)"
 echo "PREVIOUS_REVISION_MAJOR=${PREV_REV_MAJOR}" >>"$GITHUB_ENV"
 echo "previous_version_major=${PREV_REV_MAJOR}" >>"$GITHUB_OUTPUT"
-PREV_REV_MINOR="$(sanitize "$(cz version --project --minor)")"
+PREV_REV_MINOR="$(cz version --project --minor)"
 echo "PREVIOUS_REVISION_MINOR=${PREV_REV_MINOR}" >>"$GITHUB_ENV"
 echo "previous_version_minor=${PREV_REV_MINOR}" >>"$GITHUB_OUTPUT"
 
@@ -111,7 +108,7 @@ else
   ACTOR=$GITHUB_ACTOR
 fi
 
-REV="$(sanitize "$(cz version --project)")"
+REV="$(cz version --project)"
 if [[ $REV == "$PREV_REV" ]]; then
   INPUT_PUSH='false'
 fi
@@ -119,10 +116,10 @@ echo "REVISION=${REV}" >>"$GITHUB_ENV"
 echo "version=${REV}" >>"$GITHUB_OUTPUT"
 echo "next_version=${REV}" >>"$GITHUB_OUTPUT"
 
-NEXT_REV_MAJOR="$(sanitize "$(cz version --project --major)")"
+NEXT_REV_MAJOR="$(cz version --project --major)"
 echo "NEXT_REVISION_MAJOR=${NEXT_REV_MAJOR}" >>"$GITHUB_ENV"
 echo "next_version_major=${NEXT_REV_MAJOR}" >>"$GITHUB_OUTPUT"
-NEXT_REV_MINOR="$(sanitize "$(cz version --project --minor)")"
+NEXT_REV_MINOR="$(cz version --project --minor)"
 echo "NEXT_REVISION_MINOR=${NEXT_REV_MINOR}" >>"$GITHUB_ENV"
 echo "next_version_minor=${NEXT_REV_MINOR}" >>"$GITHUB_OUTPUT"
 

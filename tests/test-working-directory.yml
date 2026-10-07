@@ -9,22 +9,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up commitizen config in a subdirectory
+      - name: Set up commitizen config in a subdirectory and git state
         run: |
           git config user.email "test@example.com"
           git config user.name "Test User"
 
           # Create a subdirectory to use as working_directory
-          mkdir -p mysubdir
+          mkdir -p myproject
 
           # Write a .cz.toml config inside the subdirectory
-          printf '[tool.commitizen]\nname = "cz_conventional_commits"\nversion = "3.0.0"\ntag_format = "v$version"\n' > mysubdir/.cz.toml
+          printf '[tool.commitizen]\nname = "cz_conventional_commits"\nversion = "5.0.0"\ntag_format = "v$version"\n' > myproject/.cz.toml
 
-          git add mysubdir/.cz.toml
-          git commit -m "chore: add commitizen config in subdir"
+          git add myproject/.cz.toml
+          git commit -m "chore: add commitizen config in myproject"
 
-          # Tag the current version
-          git tag v3.0.0
+          # Tag the current version so commitizen knows where we are
+          git tag v5.0.0
+
+          # Add a feat commit so commitizen has something to bump
+          git commit --allow-empty -m "feat: add feature for working_directory test"
 
           # Set up a git origin reachable inside the Docker container
           rm -rf "$GITHUB_WORKSPACE/.git-remote"
@@ -37,25 +40,25 @@ jobs:
       - id: action
         uses: .
         with:
-          working_directory: mysubdir
+          working_directory: "myproject"
           dry_run: "true"
           push: "false"
           changelog: "false"
-          increment: "PATCH"
+          increment: "MINOR"
           no_raise: "21"
 
-      - name: Assert previous_version is 3.0.0
+      - name: Assert previous_version is 5.0.0
         env:
           PREV: ${{ steps.action.outputs.previous_version }}
         run: |
           echo "previous_version: $PREV"
-          if [ "$PREV" != "3.0.0" ]; then
-            echo "FAIL: expected previous_version=3.0.0 but got '$PREV'"
+          if [ "$PREV" != "5.0.0" ]; then
+            echo "FAIL: expected previous_version=5.0.0 but got '$PREV'"
             exit 1
           fi
-          echo "PASS: previous_version=3.0.0"
+          echo "PASS: previous_version=5.0.0"
 
-      - name: Assert next_version is set
+      - name: Assert next_version output is set
         env:
           NEXT: ${{ steps.action.outputs.next_version }}
         run: |
